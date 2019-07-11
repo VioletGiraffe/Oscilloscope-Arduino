@@ -1,3 +1,4 @@
+#include "sdcard.h"
 #include <arduino-utils.hpp>
 
 #include <SPI.h>
@@ -54,28 +55,13 @@ force_inline void cidDmp(SdFat& sd)
 	cout << endl;
 }
 
-force_inline void runSdBenchmark()
+force_inline void runSdBenchmark(uint8_t* buf, size_t BUF_SIZE, SdFat& sd)
 {
-	SdFat sd;
-
-	// Set ENABLE_EXTENDED_TRANSFER_CLASS to use extended SD I/O.
-	// Requires dedicated use of the SPI bus.
-	// SdFatEX sd;
-
-	// Set ENABLE_SOFTWARE_SPI_CLASS to use software SPI.
-	// Args are misoPin, mosiPin, sckPin.
-	// SdFatSoftSpi<6, 7, 5> sd;
-
-	// test file
-	SdFile file;
-
 	float s;
 	uint32_t t;
 	uint32_t maxLatency;
 	uint32_t minLatency;
 	uint32_t totalLatency;
-
-	uint8_t buf[BUF_SIZE];
 
 	// Serial output stream
 	ArduinoOutStream cout(Serial);
@@ -85,31 +71,12 @@ force_inline void runSdBenchmark()
 	// use uppercase in hex and use 0X base prefix
 	cout << uppercase << showbase << endl;
 
-	// Discard any input.
-	do
-	{
-		delay(10);
-	} while (Serial.available() && Serial.read() >= 0);
-
-	// F( stores strings in flash to save RAM
-	cout << F("chipSelect: ") << int(SS) << endl;
-
-	// Initialize at the highest speed supported by the board that is
-	// not over 50 MHz. Try a lower speed if SPI errors occur.
-	if (!sd.begin(chipSelect, SD_SCK_MHZ(50)))
-	{
-		sd.initErrorHalt();
-	}
-
-	cout << F("Type is FAT") << int(sd.vol()->fatType()) << endl;
-	cout << F("Card size: ") << sd.card()->cardSize() * 512E-9;
-	cout << F(" GB (GB = 1E9 bytes)") << endl;
-
-	cidDmp(sd);
-
+	// test file
+	SdFile file;
 	// open or create file - truncate existing file.
 	if (!file.open("bench.dat", O_RDWR | O_CREAT | O_TRUNC))
 	{
+		sd.errorPrint(&Serial);
 		error("open failed");
 	}
 
@@ -213,4 +180,62 @@ force_inline void runSdBenchmark()
 	cout << endl
 		 << F("Done") << endl;
 	file.close();
+	file.remove();
+}
+
+void runSdBenchmark()
+{
+	SdFat sd;
+
+	// Set ENABLE_EXTENDED_TRANSFER_CLASS to use extended SD I/O.
+	// Requires dedicated use of the SPI bus.
+	// SdFatEX sd;
+
+	// Set ENABLE_SOFTWARE_SPI_CLASS to use software SPI.
+	// Args are misoPin, mosiPin, sckPin.
+	// SdFatSoftSpi<6, 7, 5> sd;
+
+	// Discard any input.
+	do
+	{
+		delay(10);
+	} while (Serial.available() && Serial.read() >= 0);
+
+	ArduinoOutStream cout(Serial);
+	// F( stores strings in flash to save RAM
+	cout << F("chipSelect: ") << int(SS) << endl;
+
+	// Initialize at the highest speed supported by the board that is
+	// not over 50 MHz. Try a lower speed if SPI errors occur.
+	if (!sd.begin(chipSelect, SD_SCK_MHZ(50)))
+	{
+		sd.initErrorHalt();
+	}
+
+	cout << F("Type is FAT") << int(sd.vol()->fatType()) << endl;
+	cout << F("Card size: ") << sd.card()->cardSize() * 512E-9;
+	cout << F(" GB (GB = 1E9 bytes)") << endl;
+
+	cidDmp(sd);
+
+	{
+		delay(1000);
+		constexpr size_t N = 256;
+		uint8_t buf[N];
+		runSdBenchmark(buf, N, sd);
+	}
+
+	// {
+	// 	delay(1000);
+	// 	constexpr int N = 1024;
+	// 	uint8_t buf[N];
+	// 	runSdBenchmark(buf, N);
+	// }
+
+	// {
+	// 	delay(1000);
+	// 	constexpr int N = 8192;
+	// 	uint8_t buf[N];
+	// 	runSdBenchmark(buf, N);
+	// }
 }
