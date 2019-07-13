@@ -77,7 +77,7 @@ force_inline void setupADC()
 	adc_disable_ts(ADC); // disable temperature sensor
 
 	adc_disable_channel_differential_input(ADC, ADC_CHANNEL_0);
-	adc_configure_trigger(ADC, ADC_TRIG_SW, ADC_MR_FREERUN_ON); // triggering from software, freerunning mode
+	adc_configure_trigger(ADC, ADC_TRIG_SW, 1); // triggering from software, freerunning mode
 	adc_disable_all_channel(ADC);
 	adc_enable_channel(ADC, ADC_CHANNEL_0); // just one channel enabled
 	adc_enable_interrupt(ADC, ADC_IER_DRDY);
