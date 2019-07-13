@@ -6,7 +6,7 @@
 
 class AdcHandler {
 public:
-	static constexpr unsigned int bufferLength = 1024;
+	static constexpr unsigned int bufferLength = 2048;
 
 	force_inline void handleValue(const uint32_t value) volatile
 	{

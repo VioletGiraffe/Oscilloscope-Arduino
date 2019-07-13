@@ -53,8 +53,15 @@ force_inline void setupDisplay()
 force_inline void setupADC()
 {
 	// Setting ADC interrupt priority to 0, all others to 1 so that ADC always has priority
-	// for (int irq = 0; irq < PERIPH_COUNT_IRQn; ++irq)
-	// 	NVIC_SetPriority(static_cast<IRQn>(irq), irq != ADC_IRQn ? 1 : 0);
+	//for (int irq = UART_IRQn; irq < PERIPH_COUNT_IRQn; ++irq)
+	NVIC_SetPriority(UART_IRQn, 1);
+	NVIC_SetPriority(USART0_IRQn, 1);
+	NVIC_SetPriority(USART1_IRQn, 1);
+	NVIC_SetPriority(USART2_IRQn, 1);
+	NVIC_SetPriority(USART3_IRQn, 1);
+	NVIC_SetPriority(SSC_IRQn, 1);
+	NVIC_SetPriority(DMAC_IRQn, 1);
+	NVIC_SetPriority(SPI0_IRQn, 1);
 
 	pinMode(A7, INPUT);
 	pmc_enable_periph_clk(ID_ADC); // To use peripheral, we must enable clock distributon to it
@@ -126,6 +133,8 @@ void setup()
 	interrupts();
 
 	Serial.begin(115200);
+
+	//runSdBenchmark();
 
 	for(;;)
 		fastLoop();
