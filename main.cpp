@@ -54,6 +54,8 @@ force_inline void setupDisplay()
 force_inline void setupADC()
 {
 	// Setting ADC interrupt priority to 0, all others to 1 so that ADC always has priority
+	NVIC_SetPriority(ADC_IRQn, 0);
+
 	NVIC_SetPriority(UART_IRQn, 1);
 	NVIC_SetPriority(USART0_IRQn, 1);
 	NVIC_SetPriority(USART1_IRQn, 1);
@@ -94,14 +96,8 @@ force_inline void setupADC()
 
 void ADC_Handler(void)
 {
-	//Serial.println("IRQ!");
-	//Check the ADC conversion status
-	// TODO: is this check needed?
-	//if ((adc_get_status(ADC) & ADC_ISR_DRDY) == ADC_ISR_DRDY)
-	{
-		//Get latest digital data value from ADC
-		adcHandler.handleValue(ADC->ADC_LCDR);
-	}
+	//Get latest digital data value from ADC
+	adcHandler.handleValue(ADC->ADC_LCDR);
 }
 
 // This local loop function should theoretically loop quicker than the standard Arduino one
@@ -111,7 +107,7 @@ force_inline void fastLoop()
 		return;
 	
 	uint16_t max = 0, min = std::numeric_limits<uint16_t>::max();
-
+	
 	const auto samples = adcHandler.completedBuffer();
 	for (unsigned int i = 0; i < adcHandler.bufferLength; ++i)
 	{
@@ -127,7 +123,7 @@ force_inline void fastLoop()
 
 void setup()
 {
-//	setupADC();
+	setupADC();
 	setupDisplay();
 
 	interrupts();
