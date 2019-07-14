@@ -11,6 +11,7 @@
 #undef min
 #undef max
 #include <algorithm>
+#include <array>
 #include <limits>
 #include <stdint.h>
 
@@ -53,7 +54,6 @@ force_inline void setupDisplay()
 force_inline void setupADC()
 {
 	// Setting ADC interrupt priority to 0, all others to 1 so that ADC always has priority
-	//for (int irq = UART_IRQn; irq < PERIPH_COUNT_IRQn; ++irq)
 	NVIC_SetPriority(UART_IRQn, 1);
 	NVIC_SetPriority(USART0_IRQn, 1);
 	NVIC_SetPriority(USART1_IRQn, 1);
@@ -127,14 +127,14 @@ force_inline void fastLoop()
 
 void setup()
 {
-	setupADC();
+//	setupADC();
 	setupDisplay();
 
 	interrupts();
 
 	Serial.begin(115200);
 
-	//runSdBenchmark();
+	runSdBenchmark();
 
 	for(;;)
 		fastLoop();

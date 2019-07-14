@@ -7,23 +7,6 @@
 // SD chip select pin
 constexpr uint8_t chipSelect = 10;
 
-// Size of read/write.
-constexpr size_t BUF_SIZE = 8192;
-
-// File size in MB where MB = 1,000,000 bytes.
-constexpr uint32_t FILE_SIZE_MB = 5;
-
-// Write pass count.
-constexpr uint8_t WRITE_COUNT = 2;
-
-// Read pass count.
-constexpr uint8_t READ_COUNT = 2;
-//==============================================================================
-// End of configuration constants.
-//------------------------------------------------------------------------------
-// File size in bytes.
-constexpr uint32_t FILE_SIZE = 1000000UL * FILE_SIZE_MB;
-
 //------------------------------------------------------------------------------
 // Store error strings in flash to save RAM.
 #define error(s) sd.errorHalt(F(s))
@@ -55,7 +38,7 @@ force_inline void cidDmp(SdFat& sd)
 	cout << endl;
 }
 
-force_inline void runSdBenchmark(uint8_t* buf, size_t BUF_SIZE, SdFat& sd)
+force_inline void runSdBenchmark(uint8_t* buf, const size_t BUF_SIZE, SdFat& sd)
 {
 	float s;
 	uint32_t t;
@@ -88,13 +71,24 @@ force_inline void runSdBenchmark(uint8_t* buf, size_t BUF_SIZE, SdFat& sd)
 	buf[BUF_SIZE - 2] = '\r';
 	buf[BUF_SIZE - 1] = '\n';
 
+	// File size in MB where MB = 1,000,000 bytes.
+	constexpr uint32_t FILE_SIZE_MB = 5;
+	// File size in bytes.
+	constexpr uint32_t FILE_SIZE = 1000000UL * FILE_SIZE_MB;
+
 	cout << F("File size ") << FILE_SIZE_MB << F(" MB\n");
 	cout << F("Buffer size ") << BUF_SIZE << F(" bytes\n");
 	cout << F("Starting write test, please wait.") << endl
 		 << endl;
+		 
+
+	// Write pass count.
+	constexpr uint8_t WRITE_COUNT = 2;
+	// Read pass count.
+	constexpr uint8_t READ_COUNT = 2;
 
 	// do write test
-	uint32_t n = FILE_SIZE / sizeof(buf);
+	uint32_t n = FILE_SIZE / BUF_SIZE;
 	cout << F("write speed and latency") << endl;
 	cout << F("speed,max,min,avg") << endl;
 	cout << F("KB/Sec,usec,usec,usec") << endl;
@@ -108,7 +102,7 @@ force_inline void runSdBenchmark(uint8_t* buf, size_t BUF_SIZE, SdFat& sd)
 		for (uint32_t i = 0; i < n; i++)
 		{
 			uint32_t m = micros();
-			if (file.write(buf, sizeof(buf)) != sizeof(buf))
+			if (file.write(buf, BUF_SIZE) != BUF_SIZE)
 			{
 				sd.errorPrint("write failed");
 				file.close();
@@ -150,8 +144,8 @@ force_inline void runSdBenchmark(uint8_t* buf, size_t BUF_SIZE, SdFat& sd)
 		{
 			buf[BUF_SIZE - 1] = 0;
 			uint32_t m = micros();
-			int32_t nr = file.read(buf, sizeof(buf));
-			if (nr != sizeof(buf))
+			int32_t nr = file.read(buf, BUF_SIZE);
+			if (nr != BUF_SIZE)
 			{
 				sd.errorPrint("read failed");
 				file.close();
