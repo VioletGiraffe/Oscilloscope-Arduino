@@ -201,7 +201,7 @@ void runSdBenchmark()
 
 	// Initialize at the highest speed supported by the board that is
 	// not over 50 MHz. Try a lower speed if SPI errors occur.
-	if (!sd.begin(chipSelect, SD_SCK_MHZ(50)))
+	if (!sd.begin(chipSelect, SPI_HALF_SPEED))
 	{
 		sd.initErrorHalt();
 	}
@@ -213,8 +213,8 @@ void runSdBenchmark()
 	cidDmp(sd);
 
 	{
-		delay(1000);
-		constexpr size_t N = 256;
+		delay(100);
+		constexpr size_t N = 2048;
 		uint8_t buf[N];
 		runSdBenchmark(buf, N, sd);
 	}

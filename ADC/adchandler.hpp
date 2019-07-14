@@ -10,8 +10,8 @@ public:
 
 	force_inline void handleValue(const uint32_t value) volatile
 	{
-		bufferInProgress()[_currentBufferCursor++] = static_cast<uint16_t>(value & 0xFFFFul);
-		if (_currentBufferCursor == bufferLength)
+		bufferInProgress()[_currentBufferCursor] = static_cast<uint16_t>(value & 0xFFFFul);
+		if (++_currentBufferCursor == bufferLength)
 		{
 			_currentBufferCursor = 0;
 			_bufferReady = true;
@@ -38,7 +38,7 @@ public:
 private:
 	force_inline void swapBuffers() volatile
 	{
-		_currentBufferIndex = (_currentBufferIndex + 1) & 0x1;
+		_currentBufferIndex = 1u - _currentBufferIndex;
 	}
 
 	force_inline volatile uint16_t* bufferInProgress() volatile
@@ -47,11 +47,11 @@ private:
 	}
 
 private:
-	volatile uint16_t _buffer1[bufferLength];
-	volatile uint16_t _buffer2[bufferLength];
+	uint16_t _buffer1[bufferLength];
+	uint16_t _buffer2[bufferLength];
 
-	volatile unsigned int _currentBufferIndex = 0;
+	uint8_t _currentBufferIndex = 0;
 	unsigned int _currentBufferCursor = 0;
 
-	volatile bool _bufferReady = false;
+	bool _bufferReady = false;
 };

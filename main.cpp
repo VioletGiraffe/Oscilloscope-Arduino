@@ -40,7 +40,7 @@ constexpr auto YELLOW = color<255, 128, 0>;
 // ADC
 //
 
-volatile AdcHandler adcHandler;
+AdcHandler adcHandler;
 
 force_inline void setupDisplay()
 {
@@ -91,10 +91,10 @@ force_inline void setupADC()
 	adc_enable_channel(ADC, ADC_CHANNEL_0); // just one channel enabled
 	adc_enable_interrupt(ADC, ADC_IER_DRDY);
 	NVIC_EnableIRQ(ADC_IRQn);
-	adc_start(ADC);
+	adc_start(ADC); // This call does nothing, as apparently on Due one of the above setup functions also causes ADC to start
 }
 
-void ADC_Handler(void)
+void ADC_Handler()
 {
 	//Get latest digital data value from ADC
 	adcHandler.handleValue(ADC->ADC_LCDR);
@@ -103,6 +103,7 @@ void ADC_Handler(void)
 // This local loop function should theoretically loop quicker than the standard Arduino one
 force_inline void fastLoop()
 {
+	return;
 	if (!adcHandler.bufferReady())
 		return;
 	
@@ -116,21 +117,21 @@ force_inline void fastLoop()
 		min = std::min(min, sample);
 	}
 
-	Serial.print(min);
-	Serial.print(' ');
-	Serial.println(max);
+	// Serial.print(min);
+	// Serial.print(' ');
+	// Serial.println(max);
 }
 
 void setup()
 {
+	Serial.begin(115200);
+
 	setupADC();
 	setupDisplay();
 
-	interrupts();
-
-	Serial.begin(115200);
-
 	runSdBenchmark();
+
+	Serial.println("Test!");
 
 	for(;;)
 		fastLoop();
