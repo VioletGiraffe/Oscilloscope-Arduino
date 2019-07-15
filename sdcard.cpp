@@ -3,24 +3,33 @@
 
 #include <SPI.h>
 #include "SdFat.h"
+#include "sdios.h"
 
 // SD chip select pin
 constexpr uint8_t chipSelect = 10;
+
+#define SD_CONFIG SdSpiConfig(chipSelect, SHARED_SPI)
+
+// Set PRE_ALLOCATE true to pre-allocate file clusters.
+constexpr bool PRE_ALLOCATE = false;
+
+// Set SKIP_FIRST_LATENCY true if the first read/write to the SD can
+// be avoid by writing a file header or reading the first record.
+constexpr bool SKIP_FIRST_LATENCY = false;
 
 //------------------------------------------------------------------------------
 // Store error strings in flash to save RAM.
 #define error(s) sd.errorHalt(F(s))
 //------------------------------------------------------------------------------
-force_inline void cidDmp(SdFat& sd)
+force_inline void cidDmp(SdFat32& sd)
 {
-	// Serial output stream
-	ArduinoOutStream cout(Serial);
-
 	cid_t cid;
 	if (!sd.card()->readCID(&cid))
 	{
 		error("readCID failed");
 	}
+
+	ArduinoOutStream cout(Serial);
 	cout << F("\nManufacturer ID: ");
 	cout << hex << int(cid.mid) << dec << endl;
 	cout << F("OEM ID: ") << cid.oid[0] << cid.oid[1] << endl;
@@ -38,13 +47,23 @@ force_inline void cidDmp(SdFat& sd)
 	cout << endl;
 }
 
-force_inline void runSdBenchmark(uint8_t* buf, const size_t BUF_SIZE, SdFat& sd)
+force_inline void runSdBenchmark(uint8_t* buf, const size_t BUF_SIZE, SdFat32& sd)
 {
+	// File size in MB where MB = 1,000,000 bytes.
+	constexpr uint32_t FILE_SIZE_MB = 5;
+	// File size in bytes.
+	constexpr uint32_t FILE_SIZE = 1000000UL * FILE_SIZE_MB;
+	// Write pass count.
+	constexpr uint8_t WRITE_COUNT = 2;
+	// Read pass count.
+	constexpr uint8_t READ_COUNT = 2;
+
 	float s;
 	uint32_t t;
 	uint32_t maxLatency;
 	uint32_t minLatency;
 	uint32_t totalLatency;
+	bool skipLatency;
 
 	// Serial output stream
 	ArduinoOutStream cout(Serial);
@@ -55,37 +74,44 @@ force_inline void runSdBenchmark(uint8_t* buf, const size_t BUF_SIZE, SdFat& sd)
 	cout << uppercase << showbase << endl;
 
 	// test file
-	SdFile file;
+	File32 file;
+	// open or create file - truncate existing file.
+	if (!sd.begin(SD_CONFIG))
+	{
+		sd.initErrorHalt(&Serial);
+	}
+	if (sd.fatType() == FAT_TYPE_EXFAT)
+	{
+		cout << F("Type is exFAT") << endl;
+	}
+	else
+	{
+		cout << F("Type is FAT") << int(sd.fatType()) << endl;
+	}
+
+	cout << F("Card size: ") << sd.card()->sectorCount() * 512E-9;
+	cout << F(" GB (GB = 1E9 bytes)") << endl;
+
+	cidDmp(sd);
+
 	// open or create file - truncate existing file.
 	if (!file.open("bench.dat", O_RDWR | O_CREAT | O_TRUNC))
 	{
-		sd.errorPrint(&Serial);
 		error("open failed");
 	}
 
 	// fill buf with known data
-	for (size_t i = 0; i < (BUF_SIZE - 2); i++)
+	for (uint16_t i = 0; i < (BUF_SIZE - 2); i++)
 	{
 		buf[i] = 'A' + (i % 26);
 	}
 	buf[BUF_SIZE - 2] = '\r';
 	buf[BUF_SIZE - 1] = '\n';
 
-	// File size in MB where MB = 1,000,000 bytes.
-	constexpr uint32_t FILE_SIZE_MB = 5;
-	// File size in bytes.
-	constexpr uint32_t FILE_SIZE = 1000000UL * FILE_SIZE_MB;
-
-	cout << F("File size ") << FILE_SIZE_MB << F(" MB\n");
-	cout << F("Buffer size ") << BUF_SIZE << F(" bytes\n");
+	cout << F("FILE_SIZE_MB = ") << FILE_SIZE_MB << endl;
+	cout << F("BUF_SIZE = ") << BUF_SIZE << F(" bytes\n");
 	cout << F("Starting write test, please wait.") << endl
 		 << endl;
-		 
-
-	// Write pass count.
-	constexpr uint8_t WRITE_COUNT = 2;
-	// Read pass count.
-	constexpr uint8_t READ_COUNT = 2;
 
 	// do write test
 	uint32_t n = FILE_SIZE / BUF_SIZE;
@@ -95,29 +121,43 @@ force_inline void runSdBenchmark(uint8_t* buf, const size_t BUF_SIZE, SdFat& sd)
 	for (uint8_t nTest = 0; nTest < WRITE_COUNT; nTest++)
 	{
 		file.truncate(0);
+		if (PRE_ALLOCATE)
+		{
+			if (!file.preAllocate(FILE_SIZE))
+			{
+				error("preAllocate failed");
+			}
+		}
 		maxLatency = 0;
 		minLatency = 9999999;
 		totalLatency = 0;
+		skipLatency = SKIP_FIRST_LATENCY;
 		t = millis();
 		for (uint32_t i = 0; i < n; i++)
 		{
 			uint32_t m = micros();
 			if (file.write(buf, BUF_SIZE) != BUF_SIZE)
 			{
-				sd.errorPrint("write failed");
-				file.close();
-				return;
+				error("write failed");
 			}
 			m = micros() - m;
-			if (maxLatency < m)
-			{
-				maxLatency = m;
-			}
-			if (minLatency > m)
-			{
-				minLatency = m;
-			}
 			totalLatency += m;
+			if (skipLatency)
+			{
+				// Wait until first write to SD, not just a copy to the cache.
+				skipLatency = file.curPosition() < 512;
+			}
+			else
+			{
+				if (maxLatency < m)
+				{
+					maxLatency = m;
+				}
+				if (minLatency > m)
+				{
+					minLatency = m;
+				}
+			}
 		}
 		file.sync();
 		t = millis() - t;
@@ -139,6 +179,7 @@ force_inline void runSdBenchmark(uint8_t* buf, const size_t BUF_SIZE, SdFat& sd)
 		maxLatency = 0;
 		minLatency = 9999999;
 		totalLatency = 0;
+		skipLatency = SKIP_FIRST_LATENCY;
 		t = millis();
 		for (uint32_t i = 0; i < n; i++)
 		{
@@ -147,23 +188,28 @@ force_inline void runSdBenchmark(uint8_t* buf, const size_t BUF_SIZE, SdFat& sd)
 			int32_t nr = file.read(buf, BUF_SIZE);
 			if (nr != BUF_SIZE)
 			{
-				sd.errorPrint("read failed");
-				file.close();
-				return;
+				error("read failed");
 			}
 			m = micros() - m;
-			if (maxLatency < m)
-			{
-				maxLatency = m;
-			}
-			if (minLatency > m)
-			{
-				minLatency = m;
-			}
 			totalLatency += m;
 			if (buf[BUF_SIZE - 1] != '\n')
 			{
-				error("data check");
+				error("data check error");
+			}
+			if (skipLatency)
+			{
+				skipLatency = false;
+			}
+			else
+			{
+				if (maxLatency < m)
+				{
+					maxLatency = m;
+				}
+				if (minLatency > m)
+				{
+					minLatency = m;
+				}
 			}
 		}
 		s = file.fileSize();
@@ -174,21 +220,10 @@ force_inline void runSdBenchmark(uint8_t* buf, const size_t BUF_SIZE, SdFat& sd)
 	cout << endl
 		 << F("Done") << endl;
 	file.close();
-	file.remove();
 }
 
 void runSdBenchmark()
 {
-	SdFat sd;
-
-	// Set ENABLE_EXTENDED_TRANSFER_CLASS to use extended SD I/O.
-	// Requires dedicated use of the SPI bus.
-	// SdFatEX sd;
-
-	// Set ENABLE_SOFTWARE_SPI_CLASS to use software SPI.
-	// Args are misoPin, mosiPin, sckPin.
-	// SdFatSoftSpi<6, 7, 5> sd;
-
 	// Discard any input.
 	do
 	{
@@ -201,6 +236,7 @@ void runSdBenchmark()
 
 	// Initialize at the highest speed supported by the board that is
 	// not over 50 MHz. Try a lower speed if SPI errors occur.
+	SdFat32 sd;
 	if (!sd.begin(chipSelect, SPI_HALF_SPEED))
 	{
 		sd.initErrorHalt();

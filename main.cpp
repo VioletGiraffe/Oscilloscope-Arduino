@@ -5,8 +5,10 @@
 #include <Arduino.h>
 #include <SPI.h>
 
-#include <MCUFRIEND_kbv.h>
+//#include <MCUFRIEND_kbv.h>
 #include <TouchScreen.h>
+#include <Adafruit_GFX.h>    // Core graphics library
+#include <Adafruit_ST7735.h>
 
 #undef min
 #undef max
@@ -24,17 +26,23 @@ void loop() {}
 constexpr int XP=8,XM=A2,YP=A3,YM=9; //ID=0x9341
 constexpr int TS_LEFT=120,TS_RT=900,TS_TOP=70,TS_BOT=920;
 
-// MCUFRIEND_kbv tft;
+ //MCUFRIEND_kbv tft;
 // TouchScreen ts = TouchScreen(XP, YP, XM, YM, 300);
+
+auto tft = Adafruit_ST7735(10, 9, -1);
 
 #define MINPRESSURE 200
 #define MAXPRESSURE 1000
 
+#define COLOR_ORDER_BGR
+
+#ifndef COLOR_ORDER_BGR
 template<uint16_t R, uint16_t G, uint16_t B>
 constexpr uint16_t color = ((R & 0xF8u) << 8) | ((G & 0xFCu) << 3) | (B >> 3u);
-
-constexpr auto BLACK = color<0, 0, 0>;
-constexpr auto YELLOW = color<255, 128, 0>;
+#else
+template<uint16_t R, uint16_t G, uint16_t B>
+constexpr uint16_t color = ((B & 0xF8u) << 8) | ((G & 0xFCu) << 3) | (R >> 3u);
+#endif
 
 //
 // ADC
@@ -44,11 +52,14 @@ AdcHandler adcHandler;
 
 force_inline void setupDisplay()
 {
+	tft.initR(INITR_MINI160x80);  // Init ST7735S mini display
+	tft.setRotation(3);
+
+	// MCUFriend setup code
 	// tft.reset();
+	// Serial.println(tft.readID(), 16);
 	// tft.begin(tft.readID());
 	// tft.fillScreen(YELLOW);
-
-	// tft.fillRect(10, 10, 50, 100, BLACK);
 }
 
 force_inline void setupADC()
@@ -89,9 +100,9 @@ force_inline void setupADC()
 	adc_configure_trigger(ADC, ADC_TRIG_SW, 1); // triggering from software, freerunning mode
 	adc_disable_all_channel(ADC);
 	adc_enable_channel(ADC, ADC_CHANNEL_0); // just one channel enabled
-	adc_enable_interrupt(ADC, ADC_IER_DRDY);
-	NVIC_EnableIRQ(ADC_IRQn);
-	adc_start(ADC); // This call does nothing, as apparently on Due one of the above setup functions also causes ADC to start
+	//adc_enable_interrupt(ADC, ADC_IER_DRDY);
+	//NVIC_EnableIRQ(ADC_IRQn);
+	//adc_start(ADC); // This call does nothing, as apparently on Due one of the above setup functions also causes ADC to start
 }
 
 void ADC_Handler()
@@ -103,6 +114,23 @@ void ADC_Handler()
 // This local loop function should theoretically loop quicker than the standard Arduino one
 force_inline void fastLoop()
 {
+	static int16_t x = 0, y = 0; 
+
+	const auto start = millis();
+
+	tft.fillScreen(color<255, 128, 0>);
+
+	constexpr int16_t rectangleWidth = 50, rectangleHeight = 10;
+	tft.fillRect(++x, ++y, rectangleWidth, rectangleHeight, 0);
+
+	if (x == tft.width() - rectangleWidth)
+		x = 0;
+	if (y == tft.height() - rectangleHeight)
+		y = 0;
+
+	const auto time = millis() - start;
+	Serial.println(time);
+
 	return;
 	if (!adcHandler.bufferReady())
 		return;
@@ -129,7 +157,7 @@ void setup()
 	setupADC();
 	setupDisplay();
 
-	runSdBenchmark();
+//	runSdBenchmark();
 
 	Serial.println("Test!");
 
