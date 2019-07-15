@@ -100,9 +100,9 @@ force_inline void setupADC()
 	adc_configure_trigger(ADC, ADC_TRIG_SW, 1); // triggering from software, freerunning mode
 	adc_disable_all_channel(ADC);
 	adc_enable_channel(ADC, ADC_CHANNEL_0); // just one channel enabled
-	//adc_enable_interrupt(ADC, ADC_IER_DRDY);
-	//NVIC_EnableIRQ(ADC_IRQn);
-	//adc_start(ADC); // This call does nothing, as apparently on Due one of the above setup functions also causes ADC to start
+	adc_enable_interrupt(ADC, ADC_IER_DRDY);
+	NVIC_EnableIRQ(ADC_IRQn);
+	adc_start(ADC); // This call does nothing, as apparently on Due one of the above setup functions also causes ADC to start
 }
 
 void ADC_Handler()
@@ -114,35 +114,21 @@ void ADC_Handler()
 // This local loop function should theoretically loop quicker than the standard Arduino one
 force_inline void fastLoop()
 {
-	static int16_t x = 0, y = 0; 
-
-	const auto start = millis();
-
-	tft.fillScreen(color<255, 128, 0>);
-
-	constexpr int16_t rectangleWidth = 50, rectangleHeight = 10;
-	tft.fillRect(++x, ++y, rectangleWidth, rectangleHeight, 0);
-
-	if (x == tft.width() - rectangleWidth)
-		x = 0;
-	if (y == tft.height() - rectangleHeight)
-		y = 0;
-
-	const auto time = millis() - start;
-	Serial.println(time);
-
-	return;
 	if (!adcHandler.bufferReady())
 		return;
 	
 	uint16_t max = 0, min = std::numeric_limits<uint16_t>::max();
+
+	tft.fillScreen(0);
 	
 	const auto samples = adcHandler.completedBuffer();
-	for (unsigned int i = 0; i < adcHandler.bufferLength; ++i)
+	for (int16_t i = 0; i < 160; ++i)
 	{
-		const auto sample = samples[i];
-		max = std::max(max, sample);
-		min = std::min(min, sample);
+		const auto sample = samples[(uint32_t)i * adcHandler.bufferLength / 160u];
+		//max = std::max(max, sample);
+		//min = std::min(min, sample);
+
+		tft.drawPixel(i, (uint32_t)sample * 80u / 4096u, color<255, 128, 0>);
 	}
 
 	// Serial.print(min);
@@ -158,8 +144,6 @@ void setup()
 	setupDisplay();
 
 //	runSdBenchmark();
-
-	Serial.println("Test!");
 
 	for(;;)
 		fastLoop();
