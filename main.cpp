@@ -81,7 +81,6 @@ force_inline void setupADC()
 
 	// 21 MHz = F_CPU (84 MHz) / 4, prescaler = 1. Normal startup is acceptable at this frequency.
 	// This is below the maximum of 22 MHz as per datasheet.
-	// 21 MHz 
 	adc_init(ADC, F_CPU, 21000000UL, ADC_STARTUP_NORM);
 	adc_disable_interrupt(ADC, 0xFFFFFFFF); // TODO: why is this needed?
 	adc_disable_anch(ADC);
@@ -117,10 +116,10 @@ force_inline void fastLoop()
 	if (!adcHandler.bufferReady())
 		return;
 	
-	uint16_t max = 0, min = std::numeric_limits<uint16_t>::max();
+	//const auto start = millis();
 
-	tft.fillScreen(0);
-	
+	//tft.fillScreen(0);
+
 	const auto samples = adcHandler.completedBuffer();
 	for (int16_t i = 0; i < 160; ++i)
 	{
@@ -130,6 +129,8 @@ force_inline void fastLoop()
 
 		tft.drawPixel(i, (uint32_t)sample * 80u / 4096u, color<255, 128, 0>);
 	}
+
+	//Serial.println(millis() - start);
 
 	// Serial.print(min);
 	// Serial.print(' ');
